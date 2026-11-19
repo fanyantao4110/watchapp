@@ -56,6 +56,15 @@ input:focus,select:focus{border-color:var(--acc)}
 .submit:hover{filter:brightness(1.15)}
 .dlbtn{font-size:11px;padding:4px 12px;border-radius:7px;cursor:pointer;text-decoration:none;white-space:nowrap;
   background:linear-gradient(180deg,#0f9d6e,#0a7a55);color:#fff;border:1px solid #17b981;font-weight:600}
+.dlbtn[data-pick]{font-family:inherit;line-height:1.5}
+.plist{display:flex;flex-direction:column;gap:8px;margin:6px 0 2px;max-height:52vh;overflow:auto}
+.prow{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:10px;text-decoration:none;
+  background:var(--card);border:1px solid var(--line);color:var(--tx);transition:.15s}
+.prow:hover{border-color:#17b981;background:#0f2018}
+.pdev{flex:1;font-weight:600;font-size:13.5px}
+.pmeta{font-size:11.5px;color:var(--tx2)}
+.pgo{font-size:11.5px;font-weight:700;padding:4px 11px;border-radius:7px;color:#fff;
+  background:linear-gradient(180deg,#0f9d6e,#0a7a55);border:1px solid #17b981}
 .empty{grid-column:1/-1;text-align:center;color:var(--tx2);padding:64px 20px;line-height:2}
 .empty b{display:block;color:#cfdae7;font-size:15px;margin-bottom:6px;font-weight:600}
 .empty code{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 7px;font-size:12px;color:#a8b8ca}
@@ -163,6 +172,7 @@ footer{text-align:center;color:#465568;font-size:11.5px;padding:32px 0 0;line-he
   <div class="tip">点上面按钮会自动打开邮件，收件人、标题和正文都填好了，你只需填手表型号、附上 hap 和收款码。</div>
   <button class="ghost" id="btnOk">关闭</button>
 </div>
+<div class="dialog" id="picker"></div>
 
 <script>
 /* ==========================================================
@@ -186,14 +196,22 @@ const MAIL = "fanyantao4110@qq.com";
    ========================================================== */
 const APPBASE = 'https://fanyantao4110.github.io/watchapp-app/';
 const FIT2 = [
-  { name: '2048新版', ver: '1.1', size: '1.7 MB', file: '2048_fit2.app' },
-  { name: '小恐龙坤坤重置版', ver: '1.0.0', size: '0.7 MB', file: 'kongkong_fit2.app' },
-  { name: '斗地主', ver: '1.0.0', size: '4.1 MB', file: 'doudizhu_fit2.app' },
-  { name: '棋类游戏(五子,围,象棋)', ver: '2.0', size: '1.0 MB', file: 'qilei_fit2.app' },
-  { name: '跳一跳,螃蟹先生', ver: '2.1', size: '10.2 MB', file: 'tiaoyi_fit2.app' }
+  { name: '2048新版', dev: 'fit2', ver: '1.1', size: '1.7 MB', file: '2048_fit2.app' },
+  { name: '小恐龙坤坤重置版', dev: 'fit2', ver: '1.0.0', size: '0.7 MB', file: 'kongkong_fit2.app' },
+  { name: '斗地主', dev: 'fit2', ver: '1.0.0', size: '4.1 MB', file: 'doudizhu_fit2.app' },
+  { name: '棋类游戏(五子,围,象棋)', dev: 'fit2', ver: '2.0', size: '1.0 MB', file: 'qilei_fit2.app' },
+  { name: '跳一跳,螃蟹先生', dev: 'fit2', ver: '2.1', size: '10.2 MB', file: 'tiaoyi_fit2.app' }
 ];
-const FIT2MAP = {};
-FIT2.forEach(d => { FIT2MAP[d.name] = d; });
+/* name -> [{dev, ver, size, file}] */
+const PKGS = {};
+FIT2.forEach(d => { (PKGS[d.name] = PKGS[d.name] || []).push(d); });
+/* 某应用已经能下载的型号 */
+function haveDevs(name) { return (PKGS[name] || []).map(d => d.dev); }
+/* 悬赏设备 = 目录里的设备 - 已有包的型号 */
+function wantedDevs(a) {
+  const have = haveDevs(a.name);
+  return (a.dev || []).filter(d => have.indexOf(d) < 0);
+}
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -202,17 +220,19 @@ const devName = c => DEV[c] || c;
 let tab = 'want';
 let view = [];
 
-/* 把 Fit2 成品并进「可下载」：图标/截图/介绍沿用目录里同名应用 */
-FIT2.forEach(d => {
-  const base = WANTED.find(x => x.name === d.name) || {};
+/* 把 Fit2 成品并进「可下载」：一个应用一张卡，型号列表存在 dev 里 */
+Object.keys(PKGS).forEach(name => {
+  const list = PKGS[name];
+  const base = WANTED.find(x => x.name === name) || {};
   DOWNLOADED.push(Object.assign({}, base, {
-    id: 'fit2-' + d.file.replace(/\.app$/, ''),
-    name: d.name,
-    ver: d.ver,
-    size: d.size,
-    note: '.app 已转好',
-    url: APPBASE + d.file,
-    ext: 'app'
+    id: 'dl-' + name,
+    name: name,
+    ver: list[0].ver,
+    size: list.map(d => d.size).join(' / '),
+    dev: list.map(d => d.dev),
+    note: '',
+    pkg: true,
+    url: null
   }));
 });
 $('#nWant').textContent = WANTED.length;
@@ -259,17 +279,21 @@ function render() {
   $('#grid').innerHTML = view.map(a => {
     const tags = [];
     tags.push('<span class="tag">' + (CAT[a.cat] || a.cat || '未分类') + '</span>');
-    if ((a.dev || []).length) tags.push('<span class="tag">' + a.dev.length + ' 设备</span>');
+    if (tab === 'want') {
+      tags.push('<span class="tag">悬赏设备 ' + wantedDevs(a).length + '</span>');
+    } else if ((a.dev || []).length) {
+      tags.push('<span class="tag">可下载 ' + a.dev.length + ' 型号</span>');
+    }
     if (a.dl) tags.push('<span class="tag">↓' + a.dl + '</span>');
     if (a.note) tags.push('<span class="tag">' + esc(a.note) + '</span>');
 
     let action = '';
     if (tab === 'want') {
-      action = '<button class="submit" data-submit="' + a.id + '">提交</button>' +
-        (FIT2MAP[a.name] ? '<a class="dlbtn" href="' + APPBASE + FIT2MAP[a.name].file +
-          '" download title="已转成 .app，可直接下载">下 .app</a>' : '');
+      action = '<button class="submit" data-submit="' + a.id + '">提交</button>';
+    } else if (a.pkg) {
+      action = '<button class="dlbtn" data-pick="' + esc(a.name) + '">选择设备下载</button>';
     } else if (a.url) {
-      action = '<a class="dlbtn" href="' + a.url + '" download>下载 .app</a>';
+      action = '<a class="dlbtn" href="' + a.url + '" download>下载</a>';
     }
 
     return '<div class="card" data-id="' + a.id + '">' +
@@ -283,7 +307,7 @@ function render() {
 
 function emptyHtml() {
   return '<div class="empty"><b>还没有可下载的应用</b>' +
-    'Fit2 已转好 ' + FIT2.length + ' 个 .app，其余应用会陆续上架。<br>' +
+    '已上架 ' + Object.keys(PKGS).length + ' 个应用（Fit2 型号），其余应用会陆续上架。<br>' +
     '现在所有应用都在「悬赏中」，点卡片里的「提交」交已签名 hap 可领 0.1 元。</div>';
 }
 
@@ -297,6 +321,26 @@ function openDialog(a) {
   $('#mask').dataset.owner = 'dialog';
 }
 
+function openPicker(name) {
+  const list = PKGS[name] || [];
+  const rows = list.map(d =>
+    '<a class="prow" href="' + APPBASE + d.file + '" download>' +
+      '<span class="pdev">' + devName(d.dev) + '</span>' +
+      '<span class="pmeta">v' + esc(d.ver) + ' · ' + esc(d.size) + ' · .app</span>' +
+      '<span class="pgo">下载</span></a>').join('');
+  $('#picker').innerHTML = '<h2>选择设备</h2>' +
+    '<div class="dlgapp"><span>应用</span><b>' + esc(name) + '</b></div>' +
+    '<div class="plist">' + (rows || '<div class="tip">暂无可用型号</div>') + '</div>' +
+    '<div class="tip">点某一台设备，下载的就是这个型号的 .app。</div>' +
+    '<button class="ghost" id="btnPickClose">关闭</button>';
+  $('#picker').classList.add('on');
+  $('#mask').classList.add('on');
+  $('#mask').dataset.owner = 'picker';
+  $('#btnPickClose').onclick = closeAll;
+  $('#picker').querySelectorAll('.prow').forEach(a => {
+    a.onclick = () => setTimeout(closeAll, 150);
+  });
+}
 function submitById(id) {
   const a = [].concat(WANTED, DOWNLOADED).find(x => String(x.id) === String(id)) || null;
   openDialog(a);
@@ -304,14 +348,16 @@ function submitById(id) {
 function closeAll() {
   $('#detail').classList.remove('on');
   $('#dialog').classList.remove('on');
+  $('#picker').classList.remove('on');
   $('#mask').classList.remove('on');
   $('#mask').dataset.owner = '';
 }
 
 function openDetail(a) {
-  const devs = (a.dev || []).length
-    ? a.dev.map(c => '<span class="dchip">' + devName(c) + '</span>').join('')
-    : '<span class="dchip">未标注</span>';
+  const devList = tab === 'want' ? wantedDevs(a) : (a.dev || []);
+  const devs = devList.length
+    ? devList.map(c => '<span class="dchip">' + devName(c) + '</span>').join('')
+    : '<span class="dchip">' + (tab === 'want' ? '可下载型号已全部上架' : '未标注') + '</span>';
 
   const head = '<div class="dhead">' + (a.icon ? '<img src="' + a.icon + '" alt="">' : '') +
     '<div style="min-width:0"><div style="font-size:18px;font-weight:700">' + esc(a.name) + '</div>' +
@@ -332,21 +378,24 @@ function openDetail(a) {
     '<div><span>下载量</span>' + (a.dl || 0) + '</div>' +
     '<div><span>评分</span>' + (a.rating || '-') + '</div>' +
     '<div><span>最近更新</span>' + (esc(a.up) || '-') + '</div>' +
-    '<div><span>支持设备数</span>' + (a.dev || []).length + '</div>' +
+    '<div><span>' + (tab === 'want' ? '悬赏设备数' : '可下载型号数') + '</span>' + devList.length + '</div>' +
     '<div><span>编号</span>' + a.id + '</div></div>';
 
   const bar = tab === 'want'
     ? '<div class="submitbar"><div>手上已经有这个应用的<b>已签名 hap</b>？' +
       '连同<b>收款码</b>发到 <b>' + MAIL + '</b>，邮件里写清应用名和你的手表型号，核对通过可得 <b>0.1 元</b>。</div>' +
-      (FIT2MAP[a.name] ? '<a class="dlbtn" href="' + APPBASE + FIT2MAP[a.name].file +
-        '" download style="margin-left:auto">下载 .app</a>' : '') +
       '<button class="submit" style="margin-left:auto" data-submit="' + a.id + '">提交</button></div>'
-    : (a.url ? '<div class="submitbar"><div>可直接下载。</div>' +
-        '<a class="dlbtn" style="margin-left:auto" href="' + a.url + '" download>下载 .app</a></div>' : '');
+    : (a.pkg
+        ? '<div class="submitbar"><div>可下载型号 ' + (a.dev || []).length + ' 个：' +
+          (a.dev || []).map(c => devName(c).replace('HUAWEI ', '')).join('、') + '。</div>' +
+          '<button class="dlbtn" style="margin-left:auto" data-pick="' + esc(a.name) + '">选择设备下载</button></div>'
+        : (a.url ? '<div class="submitbar"><div>可直接下载。</div>' +
+            '<a class="dlbtn" style="margin-left:auto" href="' + a.url + '" download>下载</a></div>' : ''));
 
   $('#detail').innerHTML = head + '<div class="dbody">' + shots +
     '<h3>应用介绍</h3><div class="desc">' + (esc(a.desc) || '（暂无介绍）') + '</div>' +
-    '<h3>支持设备</h3><div class="dchips">' + devs + '</div>' +
+    (tab === 'want' ? '<h3>悬赏设备</h3>' : '<h3>可下载型号</h3>') +
+    '<div class="dchips">' + devs + '</div>' +
     '<h3>其他信息</h3>' + kv + bar + '</div>';
 
   $('#detail').classList.add('on');
@@ -361,7 +410,8 @@ function openDetail(a) {
 
 $('#grid').onclick = e => {
   if (e.target.closest('[data-submit]')) return;   // 交给全局委托
-  if (e.target.closest('a.dlbtn')) return;         // 下载按钮直接走链接
+  if (e.target.closest('a.dlbtn')) return;         // 下载链接直接走链接
+  if (e.target.closest('[data-pick]')) return;     // 选择设备交给全局委托
   const card = e.target.closest('.card');
   if (!card) return;
   const a = pool().find(x => String(x.id) === card.dataset.id);
@@ -373,6 +423,12 @@ document.addEventListener('click', e => {
   if (!b) return;
   e.stopPropagation();
   submitById(b.dataset.submit);
+});
+document.addEventListener('click', e => {
+  const p = e.target.closest('[data-pick]');
+  if (!p) return;
+  e.stopPropagation();
+  openPicker(p.dataset.pick);
 });
 
 document.querySelectorAll('.tab').forEach(t => {
