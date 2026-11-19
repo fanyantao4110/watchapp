@@ -1,0 +1,11 @@
+{
+ "updated": "2026-11-19",
+ "base": "https://fanyantao4110.github.io/watchapp-app/",
+ "apps": [
+  { "name": "2048新版", "dev": "fit2", "ver": "1.1", "size": "1.7 MB", "file": "2048_fit2.app" },
+  { "name": "小恐龙坤坤重置版", "dev": "fit2", "ver": "1.0.0", "size": "0.7 MB", "file": "kongkong_fit2.app" },
+  { "name": "斗地主", "dev": "fit2", "ver": "1.0.0", "size": "4.1 MB", "file": "doudizhu_fit2.app" },
+  { "name": "棋类游戏(五子,围,象棋)", "dev": "fit2", "ver": "2.0", "size": "1.0 MB", "file": "qilei_fit2.app" },
+  { "name": "跳一跳,螃蟹先生", "dev": "fit2", "ver": "2.1", "size": "10.2 MB", "file": "tiaoyi_fit2.app" }
+ ]
+}
