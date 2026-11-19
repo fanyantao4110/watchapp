@@ -54,7 +54,7 @@ input:focus,select:focus{border-color:var(--acc)}
   background:linear-gradient(180deg,#2b6bff,#1f52c9);color:#fff;border:1px solid #3f7bff;
   font-family:inherit;font-weight:600;letter-spacing:.3px;transition:.15s}
 .submit:hover{filter:brightness(1.15)}
-.dlbtn{font-size:11px;padding:4px 12px;border-radius:7px;cursor:pointer;text-decoration:none;
+.dlbtn{font-size:11px;padding:4px 12px;border-radius:7px;cursor:pointer;text-decoration:none;white-space:nowrap;
   background:linear-gradient(180deg,#0f9d6e,#0a7a55);color:#fff;border:1px solid #17b981;font-weight:600}
 .empty{grid-column:1/-1;text-align:center;color:var(--tx2);padding:64px 20px;line-height:2}
 .empty b{display:block;color:#cfdae7;font-size:15px;margin-bottom:6px;font-weight:600}
@@ -180,6 +180,21 @@ const DEV = {"fit2":"HUAWEI FIT 2","fit3":"HUAWEI FIT 3","fit4":"HUAWEI FIT 4","
 const CAT = {"game": "游戏", "tools": "工具", "entertainment": "娱乐", "health": "健康", "self_sign_upload": "自助上传"};
 const MAIL = "fanyantao4110@qq.com";
 
+/* ==========================================================
+   Fit2 已转 .app 的成品（文件托管在 watchapp-app 仓库 / Pages）
+   name 要与上面悬赏中里的应用名一致，才能对上图标和截图
+   ========================================================== */
+const APPBASE = 'https://fanyantao4110.github.io/watchapp-app/';
+const FIT2 = [
+  { name: '2048新版', ver: '1.1', size: '1.7 MB', file: '2048_fit2.app' },
+  { name: '小恐龙坤坤重置版', ver: '1.0.0', size: '0.7 MB', file: 'kongkong_fit2.app' },
+  { name: '斗地主', ver: '1.0.0', size: '4.1 MB', file: 'doudizhu_fit2.app' },
+  { name: '棋类游戏(五子,围,象棋)', ver: '2.0', size: '1.0 MB', file: 'qilei_fit2.app' },
+  { name: '跳一跳,螃蟹先生', ver: '2.1', size: '10.2 MB', file: 'tiaoyi_fit2.app' }
+];
+const FIT2MAP = {};
+FIT2.forEach(d => { FIT2MAP[d.name] = d; });
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const devName = c => DEV[c] || c;
@@ -187,6 +202,19 @@ const devName = c => DEV[c] || c;
 let tab = 'want';
 let view = [];
 
+/* 把 Fit2 成品并进「可下载」：图标/截图/介绍沿用目录里同名应用 */
+FIT2.forEach(d => {
+  const base = WANTED.find(x => x.name === d.name) || {};
+  DOWNLOADED.push(Object.assign({}, base, {
+    id: 'fit2-' + d.file.replace(/\.app$/, ''),
+    name: d.name,
+    ver: d.ver,
+    size: d.size,
+    note: '.app 已转好',
+    url: APPBASE + d.file,
+    ext: 'app'
+  }));
+});
 $('#nWant').textContent = WANTED.length;
 $('#nDl').textContent = DOWNLOADED.length;
 $('#mailtxt').textContent = MAIL;
@@ -237,9 +265,11 @@ function render() {
 
     let action = '';
     if (tab === 'want') {
-      action = '<button class="submit" data-submit="' + a.id + '">提交</button>';
+      action = '<button class="submit" data-submit="' + a.id + '">提交</button>' +
+        (FIT2MAP[a.name] ? '<a class="dlbtn" href="' + APPBASE + FIT2MAP[a.name].file +
+          '" download title="已转成 .app，可直接下载">下 .app</a>' : '');
     } else if (a.url) {
-      action = '<a class="dlbtn" href="' + a.url + '" download>下载</a>';
+      action = '<a class="dlbtn" href="' + a.url + '" download>下载 .app</a>';
     }
 
     return '<div class="card" data-id="' + a.id + '">' +
@@ -253,7 +283,7 @@ function render() {
 
 function emptyHtml() {
   return '<div class="empty"><b>还没有可下载的应用</b>' +
-    '应用会陆续上架，敬请期待。<br>' +
+    'Fit2 已转好 ' + FIT2.length + ' 个 .app，其余应用会陆续上架。<br>' +
     '现在所有应用都在「悬赏中」，点卡片里的「提交」交已签名 hap 可领 0.1 元。</div>';
 }
 
@@ -308,9 +338,11 @@ function openDetail(a) {
   const bar = tab === 'want'
     ? '<div class="submitbar"><div>手上已经有这个应用的<b>已签名 hap</b>？' +
       '连同<b>收款码</b>发到 <b>' + MAIL + '</b>，邮件里写清应用名和你的手表型号，核对通过可得 <b>0.1 元</b>。</div>' +
+      (FIT2MAP[a.name] ? '<a class="dlbtn" href="' + APPBASE + FIT2MAP[a.name].file +
+        '" download style="margin-left:auto">下载 .app</a>' : '') +
       '<button class="submit" style="margin-left:auto" data-submit="' + a.id + '">提交</button></div>'
     : (a.url ? '<div class="submitbar"><div>可直接下载。</div>' +
-        '<a class="dlbtn" style="margin-left:auto" href="' + a.url + '" download>下载</a></div>' : '');
+        '<a class="dlbtn" style="margin-left:auto" href="' + a.url + '" download>下载 .app</a></div>' : '');
 
   $('#detail').innerHTML = head + '<div class="dbody">' + shots +
     '<h3>应用介绍</h3><div class="desc">' + (esc(a.desc) || '（暂无介绍）') + '</div>' +
@@ -329,6 +361,7 @@ function openDetail(a) {
 
 $('#grid').onclick = e => {
   if (e.target.closest('[data-submit]')) return;   // 交给全局委托
+  if (e.target.closest('a.dlbtn')) return;         // 下载按钮直接走链接
   const card = e.target.closest('.card');
   if (!card) return;
   const a = pool().find(x => String(x.id) === card.dataset.id);
