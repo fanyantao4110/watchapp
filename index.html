@@ -189,12 +189,13 @@ const WANTED = [{"id":115,"name":"斗地主","icon":"icon/115.png","shots":["sho
 const DEV = {"fit2":"HUAWEI FIT 2","fit3":"HUAWEI FIT 3","fit4":"HUAWEI FIT 4","WatchD":"HUAWEI Watch D","WatchD2":"HUAWEI Watch D2","fit5":"HUAWEI FIT 5","WatchD3":"HUAWEI Watch D3","gt2":"HUAWEI WATCH GT 2","gt3":"HUAWEI WATCH GT 3","gt4":"HUAWEI WATCH GT 4","gt5":"HUAWEI WATCH GT 5","gt6":"HUAWEI WATCH GT 6","GTCyber":"HUAWEI GT Cyber","GTRunner":"HUAWEI GT Runner","GS3":"HONOR GS3","GSPRO":"HONOR GSPRO","Buds":"HUAWEI Watch buds","ultimate":"HUAWEI Watch ultimate","GT2022DC":"HUAWEI GT2022 典藏版","GT7":"HUAWEI WATCH GT7"};
 const CAT = {"game": "游戏", "tools": "工具", "entertainment": "娱乐", "health": "健康", "self_sign_upload": "自助上传"};
 const MAIL = "harmonywatchapp@163.com";
-
 /* ==========================================================
-   Fit2 已转 .app 的成品（文件托管在 watchapp-app 仓库 / Pages）
-   name 要与上面悬赏中里的应用名一致，才能对上图标和截图
+   已转 .app 的成品（文件托管在 watchapp-app 仓库 / Pages）
+   name 要与上面悬赏中的应用名一致，才能对上图标和截图
+   数据从 pkgs.json 加载，新增型号只需改 json，不用动本文件
    ========================================================== */
 const APPBASE = 'https://fanyantao4110.github.io/watchapp-app/';
+/* 兜底：pkgs.json 加载失败时至少还有 Fit2 这几个能下 */
 const FIT2 = [
   { name: '2048新版', dev: 'fit2', ver: '1.1', size: '1.7 MB', file: '2048_fit2.app' },
   { name: '小恐龙坤坤重置版', dev: 'fit2', ver: '1.0.0', size: '0.7 MB', file: 'kongkong_fit2.app' },
@@ -204,7 +205,38 @@ const FIT2 = [
 ];
 /* name -> [{dev, ver, size, file}] */
 const PKGS = {};
-FIT2.forEach(d => { (PKGS[d.name] = PKGS[d.name] || []).push(d); });
+function addPkg(d) {
+  const list = PKGS[d.name] = PKGS[d.name] || [];
+  // 同一型号同一文件只收一次（FIT2 兜底与 pkgs.json 会有重叠）
+  if (list.some(x => x.dev === d.dev && x.file === d.file)) return;
+  list.push(d);
+}
+FIT2.forEach(addPkg);
+/* 从 pkgs.json 加载完整型号表（含 GT7），失败时保留 FIT2 兜底 */
+function loadPkgs() {
+  return fetch('pkgs.json', { cache: 'no-cache' })
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      if (!j || !Array.isArray(j.apps)) return;
+      j.apps.forEach(addPkg);
+      rebuildDownloaded();
+      const nd = $('#nDl'); if (nd) nd.textContent = DOWNLOADED.length;
+      // 设备下拉里补上新增型号（如 GT7），已存在的不重复加
+      const sel = $('#device');
+      if (sel) {
+        const have = new Set([...sel.options].map(o => o.value));
+        const cnt = {};
+        [].concat(WANTED, DOWNLOADED).forEach(a => (a.dev || []).forEach(x => cnt[x] = (cnt[x] || 0) + 1));
+        Object.keys(cnt).sort((x, y) => cnt[y] - cnt[x]).forEach(x => {
+          if (have.has(x)) return;
+          sel.insertAdjacentHTML('beforeend',
+            '<option value="' + x + '">' + devName(x).replace('HUAWEI ', '') + ' (' + cnt[x] + ')</option>');
+        });
+      }
+      if (typeof render === 'function') render();
+    })
+    .catch(() => {});
+}
 /* 某应用已经能下载的型号 */
 function haveDevs(name) { return (PKGS[name] || []).map(d => d.dev); }
 /* 悬赏设备 = 目录里的设备 - 已有包的型号 */
@@ -213,6 +245,7 @@ function wantedDevs(a) {
   return (a.dev || []).filter(d => have.indexOf(d) < 0);
 }
 
+
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const devName = c => DEV[c] || c;
@@ -220,21 +253,32 @@ const devName = c => DEV[c] || c;
 let tab = 'want';
 let view = [];
 
-/* 把 Fit2 成品并进「可下载」：一个应用一张卡，型号列表存在 dev 里 */
-Object.keys(PKGS).forEach(name => {
-  const list = PKGS[name];
-  const base = WANTED.find(x => x.name === name) || {};
-  DOWNLOADED.push(Object.assign({}, base, {
-    id: 'dl-' + name,
-    name: name,
-    ver: list[0].ver,
-    size: list.map(d => d.size).join(' / '),
-    dev: list.map(d => d.dev),
-    note: '',
-    pkg: true,
-    url: null
-  }));
-});
+/* 把已有 .app 的型号并进「可下载」：一个应用一张卡，型号列表存在 dev 里。
+   pkgs.json 异步加载完会再调一次，所以要能重复执行（先清空再重建）。 */
+function rebuildDownloaded() {
+  DOWNLOADED.length = 0;
+  Object.keys(PKGS).forEach(name => {
+    const list = PKGS[name];
+    const base = WANTED.find(x => x.name === name) || {};
+    DOWNLOADED.push(Object.assign({}, base, {
+      id: 'dl-' + name,
+      name: name,
+      // 版本取最新那条（列表末尾是后加载的，通常就是新加的型号）
+      ver: list[list.length - 1].ver,
+      size: [...new Set(list.map(d => d.size))].join(' / '),
+      dev: [...new Set(list.map(d => d.dev))],
+      cat: base.cat || 'game',
+      desc: base.desc || '',
+      dev_name: base.dev_name || '',
+      shots: base.shots || [],
+      icon: base.icon || '',
+      note: '',
+      pkg: true,
+      url: null
+    }));
+  });
+}
+rebuildDownloaded();
 $('#nWant').textContent = WANTED.length;
 $('#nDl').textContent = DOWNLOADED.length;
 $('#mailtxt').textContent = MAIL;
@@ -484,6 +528,8 @@ document.addEventListener('keydown', e => {
 
 $('#foot').innerHTML = '「悬赏中」共 ' + WANTED.length + ' 个应用 · 提交已签名 hap 与收款码至 ' + MAIL + '，邮件里写明应用名与手表型号；核对通过发放 0.1 元';
 render();
+/* 型号表可能比首屏慢一点，加载完再刷一次：让 GT7 等型号立刻从「悬赏」变「可下载」 */
+loadPkgs();
 </script>
 </body>
 </html>
