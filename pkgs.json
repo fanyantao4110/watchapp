@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-24",
+ "updated": "2026-11-25",
  "base": "https://fanyantao4110.github.io/watchapp-app/",
  "apps": [
   {
@@ -148,6 +148,27 @@
    "ver": "1.0.4",
    "size": "3.1 MB",
    "file": "sanguosha_gt7.app"
+  },
+  {
+   "name": "堆叠大陆",
+   "dev": "GT7",
+   "ver": "1.0.4",
+   "size": "13.22 MB",
+   "file": "stacklands_gt7.app"
+  },
+  {
+   "name": "茶叶蛋大冒险",
+   "dev": "GT7",
+   "ver": "1.0.3",
+   "size": "1.52 MB",
+   "file": "tealeaf_gt7.app"
+  },
+  {
+   "name": "传说之下",
+   "dev": "GT7",
+   "ver": "1.0.11",
+   "size": "1.50 MB",
+   "file": "undertale_gt7.app"
   }
  ]
 }
